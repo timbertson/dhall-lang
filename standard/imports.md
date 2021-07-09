@@ -720,6 +720,34 @@ referentially transparent, if it honours CORS, no header forwarding necessary,
 etc.  Canonicalization and chaining are the only transformations applied to the
 import.
 
+HTTP headers are added used when a every remote import, based on user configuration.
+This configuration has the type:
+
+When requesting a remote resource, include headers according to the user's
+configuration. This configuration has the type:
+
+```
+{ mapKey : Text, mapValue : { mapKey : Text, mapValue : Text } }
+```
+
+(i.e. "Map Text (Map Text Text)" using the prelude `Map` type constructor)
+
+The key of this expression represents an HTTP(s) origin, including
+port - e.g. "https://github.com:443".
+
+When importing from an origin which appears as a key in this configuration,
+an implementation must add the corresponding headers (the Map Text Text)
+to each request.
+
+The configuration is loaded from either the environment or a configuration file:
+
+1. If the DHALL_HEADERS environment variable is set, interpret it as a dhall expression
+2. Otherwise, load the file at "$XDG_CONFIG_HOME/dhall/headers.dhall"
+2. If the XDG_CONFIG_HOME environment variable is not set, it is assumed to be `~/.cache` (i.e. `.cache` within the user's home directory).
+
+If DHALL_HEADERS is set, no configuration file is loaded. If a configuration file is not
+found at the searched path, it is treated as an empty list.
+
 If an import ends with `using headers`, resolve the `headers` import and use
 the resolved expression as additional headers supplied to the HTTP request:
 
@@ -749,6 +777,12 @@ For example, if `normalizedRequestHeaders` in the above judgment was:
 include the following header line:
 
     Authorization: token 5199831f4dd3b79e7c5b7e0ebe75d67aa66e79d4
+
+If headers appear both in the user configuration for a given origin and inline
+(`using headers`), they are merged. If a header is specified in both locations,
+the user configuration takes precedence over the inline headers. This allows
+inline headers to be used as a fallback for compatibility with previous
+versions of dhall or users without custom configuration.
 
 If the import is protected with a `sha256:base16Hash` integrity check, then:
 
