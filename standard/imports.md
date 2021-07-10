@@ -617,6 +617,23 @@ then you retrieve the expression from the canonicalized path and transitively
 resolve imports within the retrieved expression:
 
 
+    Γ(env:DHALL_HEADERS ? "${XDG_CONFIG_HOME:~/.config}/dhall/headers.dhall") = headers
+    parent </> https://authority directory file using headers = import₁
+    canonicalize(import₁) = child
+    referentiallySane(parent, child)
+    Γ(child) = e₀ using responseHeaders  ; Retrieve the expression, possibly
+                                         ; binding any response headers to
+                                         ; `responseHeaders` if child was a
+                                         ; remote import
+    corsCompliant(parent, child, responseHeaders)  ; If `child` was not a remote
+                                                   ; import and therefore had no
+                                                   ; response headers then skip
+                                                   ; this CORS check
+    (Δ, parent, child) × Γ₀ ⊢ e₀ ⇒ e₁ ⊢ Γ₁
+    ε ⊢ e₁ : T
+    ────────────────────────────────────  ; * child ∉ (Δ, parent)
+    (Δ, parent) × Γ₀ ⊢ https://authority directory file ⇒ e₁ ⊢ Γ₁  ; * import₀ ≠ missing
+
     parent </> import₀ = import₁
     canonicalize(import₁) = child
     referentiallySane(parent, child)
@@ -743,7 +760,7 @@ The configuration is loaded from either the environment or a configuration file:
 
 1. If the DHALL_HEADERS environment variable is set, interpret it as a dhall expression
 2. Otherwise, load the file at "$XDG_CONFIG_HOME/dhall/headers.dhall"
-2. If the XDG_CONFIG_HOME environment variable is not set, it is assumed to be `~/.cache` (i.e. `.cache` within the user's home directory).
+3. If the XDG_CONFIG_HOME environment variable is not set, it is assumed to be `~/.config` (i.e. `.config` within the user's home directory).
 
 If DHALL_HEADERS is set, no configuration file is loaded. If a configuration file is not
 found at the searched path, it is treated as an empty list.
@@ -752,10 +769,12 @@ If an import ends with `using headers`, resolve the `headers` import and use
 the resolved expression as additional headers supplied to the HTTP request:
 
 
+    Γ(env:DHALL_HEADERS ? "${XDG_CONFIG_HOME:~/.config}/dhall/headers.dhall") = headers
+    ε ⊢ headers : List { mapKey : Text, mapValue : Text }
     (Δ, parent) × Γ₀ ⊢ requestHeaders ⇒ resolvedRequestHeaders ⊢ Γ₁
     ε ⊢ resolvedRequestHeaders : H
     H ∈ { List { mapKey : Text, mapValue : Text }, List { header : Text, value : Text } }
-    resolvedRequestHeaders ⇥ normalizedRequestHeaders
+    headers # resolvedRequestHeaders ⇥ normalizedRequestHeaders
     parent </> https://authority directory file using normalizedRequestHeaders = import
     canonicalize(import) = child
     referentiallySane(parent, child)
