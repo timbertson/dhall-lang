@@ -617,7 +617,7 @@ then you retrieve the expression from the canonicalized path and transitively
 resolve imports within the retrieved expression:
 
 
-    Γ(env:DHALL_HEADERS ? "${XDG_CONFIG_HOME:~/.config}/dhall/headers.dhall") = headers
+    Γ(env:DHALL_HEADERS ? "${XDG_CONFIG_HOME}/dhall/headers.dhall" ? ~/.config/dhall/headers.dhall) = headers
     parent </> https://authority directory file using headers = import₁
     canonicalize(import₁) = child
     referentiallySane(parent, child)
@@ -737,9 +737,6 @@ referentially transparent, if it honours CORS, no header forwarding necessary,
 etc.  Canonicalization and chaining are the only transformations applied to the
 import.
 
-HTTP headers are added used when a every remote import, based on user configuration.
-This configuration has the type:
-
 When requesting a remote resource, include headers according to the user's
 configuration. This configuration has the type:
 
@@ -749,32 +746,35 @@ configuration. This configuration has the type:
 
 (i.e. "Map Text (Map Text Text)" using the prelude `Map` type constructor)
 
-The key of this expression represents an HTTP(s) origin, including
-port - e.g. "https://github.com:443".
+The toplevel map is known as the "origin header configuration", and the individual maps
+which make up the keys of the toplevel map are known as the "per-origin headers".
 
-When importing from an origin which appears as a key in this configuration,
-an implementation must add the corresponding headers (the Map Text Text)
-to each request.
+The key of this expression represents an HTTP(s) origin, including
+port - e.g. "github.com:443".
+
+When importing from an origin which appears as a key in the origin header configuration,
+an implementation must add the corresponding per-origin headers to each request.
 
 The configuration is loaded from either the environment or a configuration file:
 
 1. If the DHALL_HEADERS environment variable is set, interpret it as a dhall expression
-2. Otherwise, load the file at "$XDG_CONFIG_HOME/dhall/headers.dhall"
-3. If the XDG_CONFIG_HOME environment variable is not set, it is assumed to be `~/.config` (i.e. `.config` within the user's home directory).
+2. Otherwise:
+   a. If $XDG_CONFIG_HOME is set, load "$XDG_CONFIG_HOME/dhall/headers.dhall"
+   b. Otherwise, load "~/.config/dhall/headers.dhall"
 
-If DHALL_HEADERS is set, no configuration file is loaded. If a configuration file is not
-found at the searched path, it is treated as an empty list.
+This file is optional - if the above steps attempt to load a path that doesn't exist,
+it's treated as an empty list, not an error.
 
 If an import ends with `using headers`, resolve the `headers` import and use
 the resolved expression as additional headers supplied to the HTTP request:
 
 
-    Γ(env:DHALL_HEADERS ? "${XDG_CONFIG_HOME:~/.config}/dhall/headers.dhall") = headers
+    Γ(env:DHALL_HEADERS ? "${XDG_CONFIG_HOME}/dhall/headers.dhall" ? ~/.config/dhall/headers.dhall) = headers
     ε ⊢ headers : List { mapKey : Text, mapValue : Text }
     (Δ, parent) × Γ₀ ⊢ requestHeaders ⇒ resolvedRequestHeaders ⊢ Γ₁
     ε ⊢ resolvedRequestHeaders : H
     H ∈ { List { mapKey : Text, mapValue : Text }, List { header : Text, value : Text } }
-    headers # resolvedRequestHeaders ⇥ normalizedRequestHeaders
+    resolvedRequestHeaders # headers ⇥ normalizedRequestHeaders
     parent </> https://authority directory file using normalizedRequestHeaders = import
     canonicalize(import) = child
     referentiallySane(parent, child)
